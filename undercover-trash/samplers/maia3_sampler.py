@@ -10,6 +10,7 @@ on first use (or loaded from a local path).
 from __future__ import annotations
 
 import logging
+from collections import deque
 
 import chess
 import torch
@@ -101,16 +102,14 @@ class Maia3Sampler(Sampler):
         dataset = self._dataset
         board = boards[-1]
 
-        tokens = dataset.tokenize_board(board)
-        history = [tokens]
-        # History beyond the current position: use_uci_history-style replay.
-        # The official engine seeds history with the current position only
-        # (padding repeats it); we replicate that behaviour.
-        from collections import deque
-        hist = deque(history, maxlen=int(self.cfg.get("history", 8)))
+        # Replay the real game history (like the official engine's
+        # --use-uci-history mode): the model sees the last `history`
+        # positions; `get_historical_tokens` pads with the earliest one.
+        history_len = int(self.cfg.get("history", 8))
+        hist = deque([dataset.tokenize_board(b) for b in boards[-history_len:]],
+                     maxlen=history_len)
         input_tokens = dataset.get_historical_tokens(
-            hist, SimpleNamespace(history=int(self.cfg.get("history", 8)),
-                                  include_time_info=False),
+            hist, SimpleNamespace(history=history_len, include_time_info=False),
             base=0.0, inc=0.0, clk_left_before=0.0, clk_ponder=0.0)
         input_tokens = input_tokens.unsqueeze(0).to(self.device)
 

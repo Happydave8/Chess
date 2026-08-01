@@ -489,8 +489,13 @@ class TrojanEngine:
                          + " ".join(f"{c.move.uci()}({c.prob:.3f})" for c in candidates[:8]))
 
         # ---- pass A: best move -----------------------------------------
-        res_a = self.validator().analyse(fen, depth=quick_depth,
-                                         movetime_ms=pass_a_ms, nodes=nodes)
+        try:
+            res_a = self.validator().analyse(fen, depth=quick_depth,
+                                             movetime_ms=pass_a_ms, nodes=nodes)
+        except ValidatorError as exc:
+            self.log.error("pass A (best move) failed: %s", exc)
+            self._print_info("validator unavailable; playing no move")
+            raise
         best_move = res_a.best_move or ""
         best_score = res_a.best_score_cp
         # Report a score so lichess-bot can resign/draw on our behalf.
