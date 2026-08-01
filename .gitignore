@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Third-party checkouts
+third_party/
+
+# Runtime artifacts
+undercover-trash/logs/
+undercover-trash/weights/
+undercover-trash/bin/
+
+# Lichess secrets
+undercover-trash/lichess/config.local.yml
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

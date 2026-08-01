@@ -1,0 +1,69 @@
+# =============================================================================
+# TrojanHorse engine configuration
+# -----------------------------------------------------------------------------
+# Paths are resolved relative to this file (weights/ and bin/ live here).
+# Every key can also be overridden at runtime via UCI setoption
+# (e.g. "setoption name SamplerElo value 1500").
+# =============================================================================
+
+sampler:
+  # maia_v1  : exact Maia-1100..1900 .pb.gz nets, loaded into PyTorch (default)
+  # maia3    : Maia-3 Chessformer with an Elo condition (needs huggingface)
+  # lc0_maia : official Maia setup via an lc0 binary (--verbose-move-stats)
+  type: maia_v1
+  candidate_count: 12          # K: how many "human" moves to evaluate deeply
+  temperature: 0.0             # maia3 sampling temperature (0 = argmax)
+  min_prob: 0.0                # drop candidates with human prob below this
+
+  maia_v1:
+    weights: weights/maia-1100.pb.gz   # 1100 = most "blunder-prone" human
+    device: cpu
+
+  maia3:
+    model: maia3-5m            # HF alias: maia3-5m | maia3-23m | maia3-79m
+    elo: 1100                  # the human strength we imitate
+    checkpoint: ""             # optional local .pt path (overrides model)
+    random_weights: false      # TESTING ONLY: skip checkpoint, random init
+    device: cpu
+
+  lc0_maia:
+    lc0_path: lc0
+    weights: weights/maia-1100.pb.gz
+    nodes: 1                   # official Maia behaviour: policy only
+    threads: 2
+
+validator:
+  # stockfish | lc0 | both   (both = every candidate must pass BOTH engines)
+  type: stockfish
+  stockfish:
+    path: bin/stockfish
+    threads: 2
+    hash_mb: 128
+  lc0:
+    path: lc0
+    weights: ""                # e.g. weights/maia-1900.pb.gz or a real lc0 net
+    threads: 2
+
+filter:                        # the "Trojan Horse" selection logic
+  win_prob_threshold: 0.45     # candidate must keep win probability >= this
+  win_prob_mode: expected      # expected = win + draw/2 (recommended);
+                               # win_only = literal WDL win share (strict)
+  max_cp_loss: 60              # ... and cost at most this many centipawns
+  min_cp_loss: 15              # ... but must LOOK at least this imperfect
+  require_not_best: true       # never play the engine's own #1 move
+  selection: rank              # rank | softmax (softmax adds variety)
+  softmax_temp: 1.5
+  top_j: 3                     # softmax samples among the top-J qualifiers
+  fallback: best               # if nothing qualifies -> play validator best
+
+time:
+  movetime_scale: 0.5          # fraction of the clock-derived budget per move
+  movetime_min_ms: 150
+  movetime_max_ms: 15000
+  quick_depth: 12              # pass A: best-move discovery depth
+  depth_cap: 22                # pass B: multipv candidate depth ceiling
+  pass_a_share: 0.30
+
+logging:
+  level: info
+  file: logs/trojan.log

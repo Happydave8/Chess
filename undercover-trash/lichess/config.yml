@@ -1,0 +1,76 @@
+# TrojanHorse — lichess-bot configuration
+# -----------------------------------------------------------------------------
+# 1. Create a Lichess account for the bot (https://lichess.org/signup).
+# 2. Create an OAuth token with the "Play games with the bot API" (bot:play)
+#    scope: https://lichess.org/account/oauth/token/create?scopes[]=bot:play
+# 3. Paste the token below. It is shown only once!
+# 4. Upgrade the account to a bot account (irreversible):
+#        python3 lichess-bot.py -u -c <this file>
+#    or https://lichess.org/api#operation/botAccountUpgrade
+# 5. Run:   ./scripts/run_bot.sh
+# -----------------------------------------------------------------------------
+# Lichess rules: bot accounts are public (the profile shows a "BOT" tag) and
+# bots must not be used to deceive human opponents. This bot is meant to be
+# a registered bot account only.
+token: "REPLACE_WITH_YOUR_BOT_PLAY_TOKEN"
+url: "https://lichess.org/"
+
+engine:
+  dir: "/home/user/Chess/undercover-trash"   # absolute path to this project
+  name: "run_engine.sh"                      # UCI wrapper (see run_engine.sh)
+  working_dir: "/home/user/Chess/undercover-trash"
+  protocol: "uci"
+  ponder: false                # TrojanHorse does not ponder
+  polyglot:
+    enabled: false
+  draw_or_resign:
+    resign_enabled: true
+    resign_score: -1200        # resign only when the deep search says we're lost
+    resign_moves: 3
+    offer_draw_enabled: false
+  online_moves:
+    chessdb_book:
+      enabled: false
+    lichess_cloud_analysis:
+      enabled: false
+    online_egtb:
+      enabled: false
+  engine_options:              # passed on the CLI: --config=<path>
+    config: "/home/user/Chess/undercover-trash/engine.yml"
+  uci_options: {}              # engine.yml already carries our tuning
+  silence_stderr: false
+
+abort_time: 20
+fake_think_time: false
+rate_limiting_delay: 0
+move_overhead: 2000
+
+correspondence:
+  move_time: 60
+  checkin_period: 600
+  disconnect_time: 300
+  ponder: false
+
+challenge:
+  concurrency: 1
+  sort_by: "best"
+  accept_bot: false
+  only_bot: false
+  max_increment: 180
+  min_increment: 0
+  max_base: 315360000
+  min_base: 0
+  variants:
+    - standard
+  time_controls:
+    - bullet
+    - blitz
+    - rapid
+    - classical
+  modes:
+    - casual
+    - rated
+
+greeting:
+  hello: "Hi! I'm {me}: I play the moves a weak human would play, but a deep search keeps me from ever actually losing. 🐴"
+  goodbye: "Thanks for the game!"

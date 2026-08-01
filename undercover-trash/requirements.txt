@@ -1,0 +1,9 @@
+# TrojanHorse engine dependencies.
+# Install torch yourself with the build that matches your machine, e.g.
+#   CPU:  pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   CUDA: pip install torch
+python-chess>=1.1000
+numpy>=1.24
+pyyaml>=6.0
+protobuf==3.20.3        # required by the vendored Maia net parser (GPL-3 code)
+huggingface_hub         # only needed for the maia3 sampler
