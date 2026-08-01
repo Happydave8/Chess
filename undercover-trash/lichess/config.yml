@@ -3,16 +3,19 @@
 # 1. Create a Lichess account for the bot (https://lichess.org/signup).
 # 2. Create an OAuth token with the "Play games with the bot API" (bot:play)
 #    scope: https://lichess.org/account/oauth/token/create?scopes[]=bot:play
-# 3. Paste the token below. It is shown only once!
+# 3. Store the token in this file's folder as `.token.env` (gitignored):
+#        echo 'LICHESS_BOT_TOKEN=lip_...' > lichess/.token.env
+#    (run_bot.sh and the systemd unit load it from there; it is shown only
+#    once on Lichess, and it must never be committed to git)
 # 4. Upgrade the account to a bot account (irreversible):
-#        python3 lichess-bot.py -u -c <this file>
+#        ./scripts/run_bot.sh -u
 #    or https://lichess.org/api#operation/botAccountUpgrade
-# 5. Run:   ./scripts/run_bot.sh
+# 5. Run:   ./scripts/run_bot.sh        (or install scripts/trojanhorse.service)
 # -----------------------------------------------------------------------------
 # Lichess rules: bot accounts are public (the profile shows a "BOT" tag) and
 # bots must not be used to deceive human opponents. This bot is meant to be
 # a registered bot account only.
-token: "REPLACE_WITH_YOUR_BOT_PLAY_TOKEN"
+token: "REPLACE_WITH_YOUR_BOT_PLAY_TOKEN"   # overridden by LICHESS_BOT_TOKEN
 url: "https://lichess.org/"
 
 engine:

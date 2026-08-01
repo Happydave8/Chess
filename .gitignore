@@ -18,3 +18,4 @@ undercover-trash/lichess/config.local.yml
 .vscode/
 .idea/
 .DS_Store
+undercover-trash/lichess/.token.env

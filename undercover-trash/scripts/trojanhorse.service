@@ -1,0 +1,38 @@
+# TrojanHorse — systemd unit for running the Lichess bot permanently (24/7).
+#
+# INSTALL (run as root):
+#   1. Replace every /home/USER/Chess below with the absolute path of your
+#      checkout (or run the sed one-liner at the bottom of this comment).
+#      The unit assumes your token lives at
+#      undercover-trash/lichess/.token.env  (LICHESS_BOT_TOKEN=lip_...).
+#   2. sudo cp undercover-trash/scripts/trojanhorse.service /etc/systemd/system/
+#   3. sudo systemctl daemon-reload
+#   4. sudo systemctl enable --now trojanhorse
+#   5. Watch it: sudo journalctl -u trojanhorse -f
+#
+# One-liner to fix paths:
+#   sed -i 's|/home/USER/Chess|/actual/path/to/Chess|g' \
+#     undercover-trash/scripts/trojanhorse.service
+#
+# NOTE: the account must be upgraded once BEFORE running the bot as a bot
+# account (./undercover-trash/scripts/run_bot.sh -u).
+
+[Unit]
+Description=TrojanHorse Lichess bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# The gitignored token file (mode 0600). Format: LICHESS_BOT_TOKEN=lip_...
+EnvironmentFile=/home/USER/Chess/undercover-trash/lichess/.token.env
+WorkingDirectory=/home/USER/Chess/third_party/lichess-bot
+ExecStart=/home/USER/Chess/.venv/bin/python /home/USER/Chess/third_party/lichess-bot/lichess-bot.py --config /home/USER/Chess/undercover-trash/lichess/config.yml
+Restart=always
+RestartSec=10
+# Optional hardening: uncomment if your account can survive a read-only home.
+# ReadOnlyPaths=/home/USER/Chess
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

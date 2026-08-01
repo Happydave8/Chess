@@ -55,13 +55,18 @@ cd <repo>
 ./undercover-trash/scripts/setup.sh
 
 # 2. Lichess bot account + token  (see "Lichess setup" below)
-#    edit undercover-trash/lichess/config.yml and paste the token
+echo 'LICHESS_BOT_TOKEN=lip_...' > undercover-trash/lichess/.token.env   # gitignored
 
 # 3. upgrade the account to a bot account (irreversible, once)
 ./undercover-trash/scripts/run_bot.sh -u
 
-# 4. go live
+# 4. go live (foreground)
 ./undercover-trash/scripts/run_bot.sh -v
+
+#    or permanently, 24/7 (systemd):
+#    sed -i 's|/home/USER/Chess|/your/checkout/path|g' undercover-trash/scripts/trojanhorse.service
+#    sudo cp undercover-trash/scripts/trojanhorse.service /etc/systemd/system/
+#    sudo systemctl enable --now trojanhorse
 ```
 
 Offline smoke test at any time:
@@ -87,11 +92,21 @@ printf 'uci\nisready\nposition startpos moves e2e4 e7e5\ngo depth 14\nquit\n' \
 2. Create an OAuth token with the **`bot:play`** scope ("Play games with the
    bot API") at
    <https://lichess.org/account/oauth/token/create?scopes[]=bot:play> —
-   the token is shown **once**, store it in `lichess/config.yml`.
+   the token is shown **once**. Store it **outside git**:
+   ```bash
+   echo 'LICHESS_BOT_TOKEN=lip_...' > undercover-trash/lichess/.token.env
+   chmod 600 undercover-trash/lichess/.token.env
+   ```
+   `run_bot.sh` and the systemd unit read it from there; lichess-bot also
+   accepts the `LICHESS_BOT_TOKEN` environment variable. The tracked
+   `lichess/config.yml` keeps a placeholder and is never used to carry the
+   token.
 3. Upgrade to a bot account: `./scripts/run_bot.sh -u`
    (or `POST /api/bot/account/upgrade`, see
    <https://lichess.org/api#operation/botAccountUpgrade>). **Irreversible.**
-4. Run the bot.
+4. Run the bot: `./scripts/run_bot.sh` (add `-v` for verbose logs), or
+   install the systemd unit `scripts/trojanhorse.service` for a permanent
+   24/7 bot (`systemctl enable --now trojanhorse`).
 
 **Lichess rules / fair play:** Lichess allows bots, but only on accounts
 that are registered as bot accounts. Bot profiles carry a public **BOT**
