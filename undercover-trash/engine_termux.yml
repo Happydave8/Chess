@@ -1,0 +1,51 @@
+# =============================================================================
+# TrojanHorse configuration for Termux (Android phones).
+#
+# Differences from engine.yml:
+#   * sampler.type: maia_numpy  — pure-numpy Maia-1100 inference (PyTorch is
+#     not available on Termux; results are identical to the torch backend)
+#   * validator.stockfish.path: "stockfish" — the Termux package binary,
+#     found automatically via $PATH (pkg install stockfish)
+#   * lighter search settings for phone CPUs
+#
+# Usage:  ./run_engine.sh --config engine_termux.yml
+#         (or set TROJAN_CONFIG=engine_termux.yml in the environment)
+# =============================================================================
+
+sampler:
+  type: maia_numpy
+  candidate_count: 8           # fewer candidates = less per-move CPU time
+  min_prob: 0.0
+
+  maia_numpy:
+    weights: weights/maia-1100.pb.gz
+
+validator:
+  type: stockfish
+  stockfish:
+    path: stockfish            # found via $PATH (pkg install stockfish)
+    threads: 2
+    hash_mb: 64                # small phone RAM footprint
+
+filter:
+  win_prob_threshold: 0.45
+  win_prob_mode: expected
+  max_cp_loss: 60
+  min_cp_loss: 15
+  require_not_best: true
+  selection: rank
+  softmax_temp: 1.5
+  top_j: 3
+  fallback: best
+
+time:
+  movetime_scale: 0.4
+  movetime_min_ms: 200
+  movetime_max_ms: 10000
+  quick_depth: 10
+  depth_cap: 18
+  pass_a_share: 0.30
+
+logging:
+  level: info
+  file: logs/trojan.log

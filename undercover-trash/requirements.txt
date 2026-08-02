@@ -1,9 +1,15 @@
 # TrojanHorse engine dependencies.
-# Install torch yourself with the build that matches your machine, e.g.
-#   CPU:  pip install torch --index-url https://download.pytorch.org/whl/cpu
-#   CUDA: pip install torch
+#
+# The Maia v1/numpy samplers need only numpy + python-chess (the .pb.gz
+# weights are parsed with a pure-Python protobuf-wire reader, no protobuf
+# package required). PyTorch is only needed for the torch-backed maia_v1
+# sampler (the engine falls back to the numpy backend automatically) and
+# huggingface_hub only for the maia3 sampler.
+#
+# Desktop install:  pip install -r requirements.txt
+# Termux install:   pkg install python-numpy && pip install python-chess pyyaml
+#                   (torch is not available on Termux — use sampler maia_numpy)
 python-chess>=1.1000
 numpy>=1.24
 pyyaml>=6.0
-protobuf==3.20.3        # required by the vendored Maia net parser (GPL-3 code)
 huggingface_hub         # only needed for the maia3 sampler

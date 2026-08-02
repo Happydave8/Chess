@@ -57,11 +57,12 @@ ENGINE_AUTHOR = "undercover-trash project"
 
 DEFAULTS = {
     "sampler": {
-        "type": "maia_v1",              # maia_v1 | maia3 | lc0_maia
+        "type": "maia_v1",              # maia_v1 | maia_numpy | maia3 | lc0_maia
         "candidate_count": 12,
         "temperature": 0.0,             # maia3 sampling temperature (0 = argmax)
         "min_prob": 0.0,                # drop candidates below this human prob
         "maia_v1": {"weights": "weights/maia-1100.pb.gz", "device": "cpu"},
+        "maia_numpy": {"weights": "weights/maia-1100.pb.gz"},
         "maia3": {"model": "maia3-5m", "elo": 1100, "checkpoint": "", "device": "cpu"},
         "lc0_maia": {"lc0_path": "lc0", "weights": "weights/maia-1100.pb.gz",
                      "nodes": 1, "threads": 2},
@@ -121,7 +122,16 @@ class PathResolver:
     def resolve(self, path: str) -> str:
         p = Path(path)
         if not p.is_absolute():
-            p = self.base / p
+            candidate = self.base / p
+            # Bare command names (no directory separator) that don't exist in
+            # the config dir fall back to $PATH — handy for system installs
+            # (e.g. `pkg install stockfish` on Termux).
+            if not candidate.exists() and "/" not in path:
+                import shutil
+                which = shutil.which(path)
+                if which:
+                    return which
+            return str(candidate)
         return str(p)
 
 
@@ -256,8 +266,20 @@ class TrojanEngine:
         stype = scfg.get("type", "maia_v1")
         try:
             if stype == "maia_v1":
-                from samplers.maia_v1_sampler import MaiaV1Sampler
-                self.sampler = MaiaV1Sampler(scfg.get("maia_v1", {}), self.paths)
+                try:
+                    import torch  # noqa: F401
+                except ImportError:
+                    self.log.warning(
+                        "torch not available; falling back to the numpy Maia "
+                        "backend (sampler behaves identically)")
+                    stype = "maia_numpy"
+                else:
+                    from samplers.maia_v1_sampler import MaiaV1Sampler
+                    self.sampler = MaiaV1Sampler(scfg.get("maia_v1", {}), self.paths)
+            elif stype == "maia_numpy":
+                from samplers.maia_numpy_sampler import MaiaNumpySampler
+                self.sampler = MaiaNumpySampler(
+                    scfg.get("maia_numpy", scfg.get("maia_v1", {})), self.paths)
             elif stype == "maia3":
                 from samplers.maia3_sampler import Maia3Sampler
                 self.sampler = Maia3Sampler(scfg.get("maia3", {}), self.paths)

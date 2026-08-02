@@ -1,9 +1,12 @@
-"""Maia v1 sampler: exact policy of the released maia-1100..1900 Lc0 nets.
+"""Maia v1 sampler (PyTorch backend): exact policy of the released nets.
 
 The net is loaded from its .pb.gz file into PyTorch (see maia_v1/lc0net.py)
 and the 1858-dim policy logits are masked to legal moves and converted to a
 probability distribution, exactly like running lc0 with `go nodes 1` on the
 same net (the official Maia setup).
+
+If PyTorch is not installed, use sampler type `maia_numpy` instead (same
+network, pure-numpy inference — see samplers/maia_numpy_sampler.py).
 """
 
 from __future__ import annotations
@@ -17,19 +20,9 @@ import torch
 from .base import MoveCandidate, Sampler, SamplerError
 from maia_v1.encoder import encode_position
 from maia_v1.lc0net import Lc0SeNet
-from maia_v1.policy_index import policy_index
+from maia_v1.policy_utils import candidates_from_logits
 
 log = logging.getLogger("trojan.sampler.maia_v1")
-
-
-def mirror_move(move_uci: str) -> str:
-    """Mirror a white-perspective UCI move to the real board (rank 1 <-> 8)."""
-    if len(move_uci) > 4:
-        return (move_uci[0] + str(9 - int(move_uci[1]))
-                + move_uci[2] + str(9 - int(move_uci[3]))
-                + move_uci[4:])
-    return (move_uci[0] + str(9 - int(move_uci[1]))
-            + move_uci[2] + str(9 - int(move_uci[3])))
 
 
 class MaiaV1Sampler(Sampler):
@@ -64,40 +57,14 @@ class MaiaV1Sampler(Sampler):
             policy_logits, value_logits = net(x)
         logits = policy_logits[0].cpu().numpy()
 
-        board = boards[-1]
-        legal_mask = np.zeros(len(policy_index), dtype=bool)
-        for move in board.legal_moves:
-            uci = move.uci() if board.turn == chess.WHITE else mirror_move(move.uci())
-            try:
-                idx = _MOVE_TO_INDEX[uci]
-            except KeyError:
-                continue
-            legal_mask[idx] = True
-        return logits, legal_mask
+        from maia_v1.policy_utils import legal_mask
+        return logits, legal_mask(boards[-1])
 
     def sample(self, boards, top_k: int) -> list[MoveCandidate]:
-        logits, legal_mask = self.policy(boards)
-        # Numerical safety: keep logits finite.
-        logits = np.where(legal_mask, logits, -1e9)
-        probs = np.exp(logits - logits.max())
-        probs /= probs.sum()
-
+        logits, _ = self.policy(boards)
         board = boards[-1]
-        order = np.argsort(-probs)
-        candidates = []
-        for rank, idx in enumerate(order[:top_k]):
-            uci = policy_index[int(idx)]
-            if board.turn == chess.BLACK:
-                uci = mirror_move(uci)
-            try:
-                move = chess.Move.from_uci(uci)
-            except ValueError:
-                continue
-            if move not in board.legal_moves:
-                continue
-            candidates.append(MoveCandidate(move=move, prob=float(probs[idx]), rank=rank))
-        return candidates
-
-
-# index lookup for the 1858 policy list
-_MOVE_TO_INDEX = {uci: i for i, uci in enumerate(policy_index)}
+        cutoff = float(self.cfg.get("min_prob", 0.0))
+        return [
+            MoveCandidate(move=m, prob=p, rank=r)
+            for m, p, r in candidates_from_logits(board, logits, top_k, cutoff)
+        ]

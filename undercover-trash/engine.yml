@@ -7,9 +7,11 @@
 # =============================================================================
 
 sampler:
-  # maia_v1  : exact Maia-1100..1900 .pb.gz nets, loaded into PyTorch (default)
-  # maia3    : Maia-3 Chessformer with an Elo condition (needs huggingface)
-  # lc0_maia : official Maia setup via an lc0 binary (--verbose-move-stats)
+  # maia_v1    : exact Maia-1100..1900 .pb.gz nets, loaded into PyTorch (default)
+  # maia_numpy : same nets, pure-numpy inference (no torch) — use on phones /
+  #               Termux / minimal servers; auto-selected if torch is missing
+  # maia3      : Maia-3 Chessformer with an Elo condition (needs huggingface)
+  # lc0_maia   : official Maia setup via an lc0 binary (--verbose-move-stats)
   type: maia_v1
   candidate_count: 12          # K: how many "human" moves to evaluate deeply
   temperature: 0.0             # maia3 sampling temperature (0 = argmax)
@@ -18,6 +20,9 @@ sampler:
   maia_v1:
     weights: weights/maia-1100.pb.gz   # 1100 = most "blunder-prone" human
     device: cpu
+
+  maia_numpy:
+    weights: weights/maia-1100.pb.gz
 
   maia3:
     model: maia3-5m            # HF alias: maia3-5m | maia3-23m | maia3-79m

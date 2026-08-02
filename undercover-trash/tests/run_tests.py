@@ -143,6 +143,110 @@ def _replay(board):
 
 
 # ---------------------------------------------------------------------------
+def test_pb_reader():
+    print("== pb_reader (pure-python .pb.gz parser) ==")
+    if not WEIGHTS.exists():
+        print("  [skip] weights not present (run scripts/download_weights.sh)")
+        return
+    from maia_v1.pb_reader import parse_net
+
+    a = parse_net(str(WEIGHTS))
+    check("input conv (64,112,3,3)", a.conv1_w.shape == (64, 112, 3, 3))
+    check("6 residual blocks", len(a.res) == 6)
+    c1w = a.res[0][0]
+    check("res conv1 (64,64,3,3)", c1w.shape == (64, 64, 3, 3))
+    check("policy1 (64,64,3,3)", a.pol1_w.shape == (64, 64, 3, 3))
+    check("policy2 (80,64,3,3) + bias 80", a.pol2_w.shape == (80, 64, 3, 3)
+          and a.pol2_b.shape == (80,))
+    check("value (32,64,1,1)", a.val_w.shape == (32, 64, 1, 1))
+    check("ip1 (128,2048)", a.ip1_w.shape == (128, 2048))
+    check("ip2 (3,128)", a.ip2_w.shape == (3, 128))
+    check("SE w2 = 2C x C/8", a.res[0][8].shape == (128, 8))
+    # finite + sane magnitude
+    import numpy as np
+    check("weights finite", np.isfinite(a.conv1_w).all())
+    check("bn scale finite", np.isfinite(a.conv1_scale).all())
+
+
+def test_backend_parity():
+    print("== torch vs numpy backend parity ==")
+    if not WEIGHTS.exists():
+        print("  [skip] weights not present")
+        return
+    try:
+        import torch  # noqa: F401
+    except ImportError:
+        print("  [skip] torch not installed")
+        return
+    import numpy as np
+    from maia_v1.encoder import encode_position
+    from maia_v1.lc0net import Lc0SeNet
+    from maia_v1.numpy_net import NumpyNet
+    from maia_v1.policy_utils import candidates_from_logits
+
+    torch_net = Lc0SeNet(str(WEIGHTS), device="cpu")
+    np_net = NumpyNet(str(WEIGHTS))
+
+    cases = [
+        [chess.Board()],
+        [chess.Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")],
+        _replay(_to_board("e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6")),
+        _replay(_to_board("d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 c4d5")),
+    ]
+    worst = 0.0
+    for boards in cases:
+        x = torch.from_numpy(encode_position(boards)).unsqueeze(0)
+        with torch.no_grad():
+            t_logits, _ = torch_net(x)
+        n_logits, _ = np_net(encode_position(boards))
+        diff = float(np.abs(t_logits[0].numpy() - n_logits).max())
+        worst = max(worst, diff)
+        t_top = candidates_from_logits(boards[-1], t_logits[0].numpy(), 3)
+        n_top = candidates_from_logits(boards[-1], n_logits, 3)
+        check("same top-1 in both backends",
+              t_top[0][0] == n_top[0][0] and t_top[1][0] == n_top[1][0],
+              f"{t_top[0][0]} vs {n_top[0][0]}")
+    check("max |logit diff| < 1e-3", worst < 1e-3, f"max diff {worst:.2e}")
+
+
+def _to_board(moves_spec: str) -> chess.Board:
+    b = chess.Board()
+    for uci in moves_spec.split():
+        b.push_uci(uci)
+    return b
+
+
+# ---------------------------------------------------------------------------
+def test_maia_numpy_sampler():
+    print("== maia_numpy sampler (no torch) ==")
+    if not WEIGHTS.exists():
+        print("  [skip] weights not present")
+        return
+    from samplers.maia_numpy_sampler import MaiaNumpySampler
+
+    class P:
+        def resolve(self, p):
+            return str(HERE / p)
+
+    s = MaiaNumpySampler({"weights": str(WEIGHTS)}, P())
+    import time
+    t0 = time.time()
+    cands = s.sample([chess.Board()], 10)
+    elapsed = time.time() - t0
+    print(f"  (numpy inference took {elapsed:.2f}s)")
+    top = [c.move.uci() for c in cands]
+    check("numpy top-1 is e2e4 (same as torch/lc0)", top[0] == "e2e4", top[0])
+    check("numpy candidates legal + sorted",
+          all(c.move in chess.Board().legal_moves for c in cands)
+          and all(cands[i].prob >= cands[i + 1].prob for i in range(len(cands) - 1)))
+    check("numpy prob of e2e4 ~ 0.66 (matches published Maia-1100)",
+          abs(cands[0].prob - 0.66) < 0.05, f"{cands[0].prob:.3f}")
+    if elapsed > 5:
+        print("  WARNING: numpy inference slow — fine on a phone, "
+              "consider candidate_count: 8")
+
+
+# ---------------------------------------------------------------------------
 def test_maia3_sampler():
     print("== maia3 sampler (random weights) ==")
     try:
@@ -265,7 +369,10 @@ def test_uci_session():
 # ---------------------------------------------------------------------------
 def main():
     test_encoder()
+    test_pb_reader()
     test_maia_v1_sampler()
+    test_maia_numpy_sampler()
+    test_backend_parity()
     test_maia3_sampler()
     test_selection()
     test_uci_session()

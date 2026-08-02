@@ -118,6 +118,63 @@ moves), not to hiding that the account is a bot.
 
 ---
 
+## Running from a phone (Termux / Android)
+
+The engine has a **pure-numpy Maia backend** (`sampler.type: maia_numpy`)
+so it runs on phones where PyTorch is not available. It produces identical
+moves to the PyTorch backend (verified to < 1e-5 logit difference) and needs
+only `numpy` + `python-chess` + Stockfish.
+
+**Install (inside Termux):**
+
+```bash
+pkg install -y git
+git clone https://github.com/Happydave8/Chess.git
+cd Chess
+./undercover-trash/scripts/install_termux.sh     # everything below, automated
+```
+
+or manually:
+
+```bash
+pkg update -y && pkg upgrade -y
+pkg install -y python git stockfish clang binutils python-numpy
+python -m pip install python-chess pyyaml
+./undercover-trash/scripts/download_weights.sh maia_v1
+echo 'LICHESS_BOT_TOKEN=lip_...' > undercover-trash/lichess/.token.env
+chmod 600 undercover-trash/lichess/.token.env
+sed -i "s|/home/user/Chess|$PWD|g" undercover-trash/lichess/config.yml
+```
+
+**Run:**
+
+```bash
+export TROJAN_CONFIG=$PWD/undercover-trash/engine_termux.yml   # phone tuning
+./undercover-trash/scripts/run_bot.sh -u                        # upgrade (once)
+./undercover-trash/scripts/run_bot.sh                           # play
+```
+
+**Keep it alive while the screen is off:**
+
+```bash
+pkg install -y tmux termux-api
+termux-wake-lock
+tmux new-session -s bot -c $PWD './undercover-trash/scripts/run_bot.sh'
+# detach:  Ctrl+B then D      reattach:  tmux attach -t bot
+```
+
+Notes:
+- `engine_termux.yml` uses `maia_numpy`, `candidate_count: 8`, lighter
+  search depths (10/18) and finds the Stockfish binary via `$PATH`
+  (`pkg install stockfish`). Adjust for your phone's speed.
+- Torch/maia3/lc0 are **not** available on Termux — the numpy backend makes
+  that irrelevant.
+- If Android kills the process (battery optimizations), enable the wake
+  lock, keep Termux in the foreground, or use a Termux:Boot script to start
+  it on boot.
+
+---
+
 ## Configuration
 
 Everything is in `engine.yml` (paths resolve relative to that file); each
